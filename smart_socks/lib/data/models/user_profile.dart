@@ -149,8 +149,9 @@ class UserProfile extends Equatable {
     
     // Age factor
     if (age != null) {
-      if (age! >= 65) factor += 20;
-      else if (age! >= 55) factor += 15;
+      if (age! >= 65) {
+        factor += 20;
+      } else if (age! >= 55) factor += 15;
       else if (age! >= 45) factor += 10;
       else if (age! >= 35) factor += 5;
     }
@@ -177,8 +178,9 @@ class UserProfile extends Equatable {
     
     // Duration factor
     if (diabetesYears != null) {
-      if (diabetesYears! >= 20) factor += 15;
-      else if (diabetesYears! >= 10) factor += 10;
+      if (diabetesYears! >= 20) {
+        factor += 15;
+      } else if (diabetesYears! >= 10) factor += 10;
       else if (diabetesYears! >= 5) factor += 5;
     }
     

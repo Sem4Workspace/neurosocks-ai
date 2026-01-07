@@ -135,7 +135,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     await userProvider.setOnboardingComplete(true);
 
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      Navigator.of(context).pushReplacementNamed('/dashboard');
     }
   }
 
@@ -549,7 +549,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
             Switch(
               value: value,
               onChanged: onChanged,
-              activeColor: AppColors.primary,
+              activeThumbColor: AppColors.primary,
             ),
           ],
         ),
@@ -763,7 +763,7 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),

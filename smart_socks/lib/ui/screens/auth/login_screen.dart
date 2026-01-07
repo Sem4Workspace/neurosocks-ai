@@ -88,7 +88,7 @@ class _LoginScreenState extends State<LoginScreen>
       _storedPin = enteredPin; // Store for future verification
       HapticFeedback.mediumImpact();
       if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/home');
+        _navigateToNextScreen();
       }
     } else {
       _showError();
@@ -99,6 +99,12 @@ class _LoginScreenState extends State<LoginScreen>
         _isLoading = false;
       });
     }
+  }
+
+  void _navigateToNextScreen() {
+    final userProvider = context.read<UserProvider>();
+    final nextRoute = userProvider.onboardingComplete ? '/dashboard' : '/profile-setup';
+    Navigator.of(context).pushReplacementNamed(nextRoute);
   }
 
   void _showError() {
@@ -122,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen>
     // Simulate successful biometric auth
     HapticFeedback.mediumImpact();
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/home');
+      _navigateToNextScreen();
     }
 
     if (mounted) {
@@ -134,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _skipLogin() {
     // For demo mode - skip authentication
-    Navigator.of(context).pushReplacementNamed('/home');
+    _navigateToNextScreen();
   }
 
   void _forgotPin() {

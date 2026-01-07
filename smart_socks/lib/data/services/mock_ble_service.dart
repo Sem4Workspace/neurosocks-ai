@@ -29,8 +29,8 @@ class MockBleService {
   // Baseline values (simulating a healthy foot)
   final List<double> _baseTemperatures = [31.5, 32.0, 31.0, 32.5]; // Heel, Ball, Arch, Toe
   final List<double> _basePressures = [35.0, 45.0, 20.0, 40.0]; // kPa
-  double _baseSpO2 = 98.0;
-  int _baseHeartRate = 72;
+  final double _baseSpO2 = 98.0;
+  final int _baseHeartRate = 72;
   int _stepCount = 0;
 
   // Anomaly simulation settings

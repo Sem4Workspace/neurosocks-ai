@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'data/services/storage_service.dart';
 import 'app.dart';
 
 /// Main entry point for Smart Socks application
@@ -23,26 +23,9 @@ void main() async {
     ),
   );
 
-  // Initialize Hive for local storage
-  await _initializeHive();
+  // Initialize storage service (Hive boxes and SharedPreferences)
+  await StorageService().initialize();
 
   // Run the app
   runApp(const SmartSocksApp());
-}
-
-/// Initialize Hive database
-Future<void> _initializeHive() async {
-  // Initialize Hive with Flutter
-  await Hive.initFlutter();
-
-  // Open boxes for persistent storage
-  // Using dynamic boxes since we're storing JSON-serializable data
-  await Future.wait([
-    Hive.openBox('sensor_readings'),
-    Hive.openBox('foot_data'),
-    Hive.openBox('risk_scores'),
-    Hive.openBox('alerts'),
-    Hive.openBox('user_profile'),
-    Hive.openBox('settings'),
-  ]);
 }
