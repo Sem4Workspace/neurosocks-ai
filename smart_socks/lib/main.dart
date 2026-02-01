@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'data/services/storage_service.dart';
 import 'app.dart';
 
 /// Main entry point for Smart Socks application
-// yet to resolve the authentication errors
-
 void main() async {
   // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +23,11 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
       statusBarBrightness: Brightness.light,
     ),
+  );
+
+  // Initialize Firebase with auto-generated config
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
   );
 
   // Initialize storage service (Hive boxes and SharedPreferences)
