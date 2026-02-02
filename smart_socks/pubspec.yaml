@@ -38,6 +38,9 @@ dependencies:
   # State Management
   provider: ^6.1.2
 
+  # For environment variables
+  flutter_dotenv: ^6.0.0
+
   # BLE Communication
   flutter_blue_plus: ^1.35.2
 
@@ -49,18 +52,19 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # 🔥 Firebase Packages
-  firebase_core: ^2.24.0
-  firebase_auth: ^4.15.0
-  cloud_firestore: ^4.14.0
-  firebase_storage: ^11.5.0
-  firebase_messaging: ^14.7.0
-  firebase_analytics: ^10.7.0
-  firebase_crashlytics: ^3.4.0
+  # 🔥 Firebase Packages - Latest stable versions
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.4
+  cloud_firestore: ^5.1.0
+  firebase_storage: ^12.1.2
+  firebase_messaging: ^15.1.1
+  firebase_analytics: ^11.1.1
+  firebase_crashlytics: ^4.1.1
   
   # Supporting packages
-  google_sign_in: ^6.1.5
+  google_sign_in: ^6.2.1
   intl: ^0.20.1
+  js: ^0.7.1
 
   # Notifications
   flutter_local_notifications: ^18.0.1
