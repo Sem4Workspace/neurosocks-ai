@@ -2,15 +2,34 @@
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../data/models/sensor_reading.dart';
 import '../data/models/foot_data.dart';
+import '../data/models/risk_score.dart';
+import '../data/services/real_ble_service.dart';
 import '../data/services/mock_ble_service.dart';
 import '../data/services/storage_service.dart';
+import '../data/services/foot_ulcer_prediction_service.dart';
+import '../data/services/firebase/firebase_firestore_service.dart';
 
 /// Provider for managing sensor data and BLE connection
 class SensorProvider extends ChangeNotifier {
-  final MockBleService _bleService = MockBleService();
+  final RealBleService _realBleService = RealBleService();
+  final MockBleService _mockBleService = MockBleService();
   final StorageService _storageService = StorageService();
+  final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
+  
+  // Use mock BLE by default for testing (change to true when deploying with real hardware)
+  bool _useRealBle = false;
+  
+  // Get current BLE service
+  dynamic get _bleService => _useRealBle ? _realBleService : _mockBleService;
+  
+  // Public getter for UI
+  bool get isUsingRealBle => _useRealBle;
+  
+  // User context
+  String? _currentUserId;
 
   // Current state
   SensorReading? _currentReading;
@@ -50,10 +69,37 @@ class SensorProvider extends ChangeNotifier {
   ActivityType get activityType =>
       _currentReading?.activityType ?? ActivityType.unknown;
 
+  // ============== User Context ==============
+
+  /// Set current user ID for user-specific data operations
+  void setCurrentUser(String userId) {
+    _currentUserId = userId;
+    notifyListeners();
+  }
+
+  /// Get current user ID
+  String? get currentUserId => _currentUserId;
+
+  /// Switch between real and mock BLE
+  void useRealBle(bool enable) {
+    _useRealBle = enable;
+    notifyListeners();
+  }
+
+  // ============== Device Scanning (Real BLE) ==============
+
+  /// Scan for available devices
+  Future<List<ScanResult>> scanForDevices() async {
+    if (!_useRealBle) {
+      throw Exception('Scanning only available with real BLE');
+    }
+    return await _realBleService.scanForDevices();
+  }
+
   // ============== Connection Management ==============
 
   /// Connect to the smart sock device
-  Future<bool> connect() async {
+  Future<bool> connect({BluetoothDevice? device}) async {
     if (_isConnected || _isConnecting) return _isConnected;
 
     _isConnecting = true;
@@ -61,7 +107,16 @@ class SensorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final success = await _bleService.connect();
+      bool success;
+      
+      if (_useRealBle && device != null) {
+        // Connect to specific device
+        await _realBleService.connectToDevice(device);
+        success = true;
+      } else {
+        // Mock connection
+        success = await _mockBleService.connect();
+      }
 
       if (success) {
         _isConnected = true;
@@ -147,7 +202,60 @@ class SensorProvider extends ChangeNotifier {
     // Save to local storage (async, don't wait)
     _storageService.saveReading(reading);
 
+    // Save to Firestore if user is logged in
+    if (_currentUserId != null) {
+      _saveReadingToFirestore(reading);
+      _savePredictionToFirestore(reading);
+    }
+
     notifyListeners();
+  }
+
+  /// Save sensor reading to Firestore (async)
+  Future<void> _saveReadingToFirestore(SensorReading reading) async {
+    if (_currentUserId == null) return;
+    
+    try {
+      await _firestoreService.saveSensorReading(
+        userId: _currentUserId!,
+        reading: reading,
+      );
+    } catch (e) {
+      debugPrint('Firestore save error: $e');
+    }
+  }
+
+  /// Save foot ulcer prediction to Firestore
+  Future<void> _savePredictionToFirestore(SensorReading reading) async {
+    if (_currentUserId == null) return;
+
+    try {
+      // Generate prediction
+      final prediction = FootUlcerPredictionService.predictRisk(
+        reading,
+        historicalReadings: _recentReadings,
+      );
+
+      // Convert to risk score for storage
+      final riskScore = RiskScore(
+        timestamp: prediction.timestamp,
+        overallScore: prediction.riskScore.toInt(),
+        riskLevel: _mapUlcerRiskToRiskLevel(prediction.level),
+        pressureRisk: reading.maxPressure.toInt(),
+        temperatureRisk: reading.maxTemperature.toInt(),
+        circulationRisk: 0,
+        gaitRisk: 0,
+        factors: prediction.riskFactors,
+        recommendations: [prediction.recommendation],
+      );
+
+      await _firestoreService.saveRiskScore(
+        userId: _currentUserId!,
+        riskScore: riskScore,
+      );
+    } catch (e) {
+      debugPrint('Prediction save error: $e');
+    }
   }
 
   /// Update foot data from sensor reading
@@ -314,6 +422,21 @@ class SensorProvider extends ChangeNotifier {
   /// Reset step count
   void resetStepCount() {
     _bleService.resetStepCount();
+  }
+
+  // ============== Helper Methods ==============
+
+  /// Map UlcerRiskLevel to RiskLevel enum
+  RiskLevel _mapUlcerRiskToRiskLevel(dynamic ulcerLevel) {
+    if (ulcerLevel.toString().contains('low')) {
+      return RiskLevel.low;
+    } else if (ulcerLevel.toString().contains('moderate')) {
+      return RiskLevel.moderate;
+    } else if (ulcerLevel.toString().contains('high')) {
+      return RiskLevel.high;
+    } else {
+      return RiskLevel.critical;
+    }
   }
 
   // ============== Cleanup ==============

@@ -87,17 +87,127 @@ class SettingsScreen extends StatelessWidget {
         ),
         if (profile != null) ...[
           const Divider(),
-          _buildInfoRow('Age', '${profile.age ?? 0} years'),
-          _buildInfoRow('Diabetes Type', profile.diabetesType?.displayName ?? 'Not set'),
-          _buildInfoRow('Years with Diabetes', '${profile.diabetesYears ?? 0} years'),
+          _buildInfoRow('Email', profile.email),
+          if (profile.age != null && profile.age! > 0)
+            _buildInfoRow('Age', '${profile.age} years'),
+          if (profile.diabetesType != null)
+            _buildInfoRow('Diabetes Type', profile.diabetesType!.displayName),
+          if (profile.diabetesYears != null && profile.diabetesYears! > 0)
+            _buildInfoRow('Years with Diabetes', '${profile.diabetesYears} years'),
+          if (profile.phone != null && profile.phone!.isNotEmpty)
+            _buildInfoRow('Phone', profile.phone!),
+          // Health Info section
+          if (profile.healthInfo != null) ...[
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Health Information',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            _buildHealthInfoItem(
+              'Neuropathy',
+              profile.healthInfo!.hasNeuropathy,
+            ),
+            _buildHealthInfoItem(
+              'Peripheral Arterial Disease (PAD)',
+              profile.healthInfo!.hasPAD,
+            ),
+            _buildHealthInfoItem(
+              'Previous Foot Ulcer',
+              profile.healthInfo!.hasPreviousUlcer,
+            ),
+            _buildHealthInfoItem(
+              'Hypertension',
+              profile.healthInfo!.hasHypertension,
+            ),
+          ],
+          // Emergency Contact Info
+          if (profile.emergencyContactName != null ||
+              profile.emergencyContactPhone != null) ...[
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Emergency Contact',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            if (profile.emergencyContactName != null &&
+                profile.emergencyContactName!.isNotEmpty)
+              _buildInfoRow('Name', profile.emergencyContactName!),
+            if (profile.emergencyContactPhone != null &&
+                profile.emergencyContactPhone!.isNotEmpty)
+              _buildInfoRow('Phone', profile.emergencyContactPhone!),
+          ],
+          // Account Dates
+          const SizedBox(height: 12),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'Account',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          _buildInfoRow(
+            'Member Since',
+            _formatDate(profile.createdAt),
+          ),
+          if (profile.lastLoginAt != null)
+            _buildInfoRow(
+              'Last Login',
+              _formatDate(profile.lastLoginAt!),
+            ),
         ],
       ],
     );
   }
 
+  /// Build health info item with checkmark
+  Widget _buildHealthInfoItem(String label, bool value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(
+            value ? Icons.check_circle : Icons.cancel,
+            size: 20,
+            color: value ? AppColors.success : Colors.grey[400],
+          ),
+          const SizedBox(width: 12),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: value ? AppColors.textPrimary : AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Format date for display
+  String _formatDate(DateTime date) {
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
   Widget _buildDeviceSection(BuildContext context, SensorProvider provider) {
     return _buildSection(
-      title: 'Device',
+      title: 'Device & Sensor',
       icon: Icons.bluetooth,
       children: [
         ListTile(
@@ -132,6 +242,19 @@ class SettingsScreen extends StatelessWidget {
                   onPressed: () => provider.connect(),
                   child: const Text('Connect'),
                 ),
+        ),
+        const Divider(),
+        SwitchListTile(
+          title: const Text('Use Real Bluetooth'),
+          subtitle: Text(
+            provider.isUsingRealBle
+                ? 'Connected to actual smart socks hardware'
+                : 'Using mock data for testing (Firebase saving enabled)',
+          ),
+          value: provider.isUsingRealBle,
+          onChanged: (value) {
+            provider.useRealBle(value);
+          },
         ),
         if (provider.isConnected) ...[
           const Divider(),
