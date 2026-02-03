@@ -246,15 +246,9 @@ class SettingsScreen extends StatelessWidget {
         const Divider(),
         SwitchListTile(
           title: const Text('Use Real Bluetooth'),
-          subtitle: Text(
-            provider.isUsingRealBle
-                ? 'Connected to actual smart socks hardware'
-                : 'Using mock data for testing (Firebase saving enabled)',
-          ),
-          value: provider.isUsingRealBle,
-          onChanged: (value) {
-            provider.useRealBle(value);
-          },
+          subtitle: const Text('Connected to actual smart socks hardware only (mock disabled)'),
+          value: true,
+          onChanged: null, // Disabled - always uses real BLE
         ),
         if (provider.isConnected) ...[
           const Divider(),
@@ -545,50 +539,163 @@ class SettingsScreen extends StatelessWidget {
     final ageController = TextEditingController(
       text: profile?.age?.toString() ?? '',
     );
+    final phoneController = TextEditingController(text: profile?.phone ?? '');
+    final emergencyNameController = TextEditingController(
+      text: profile?.emergencyContactName ?? '',
+    );
+    final emergencyPhoneController = TextEditingController(
+      text: profile?.emergencyContactPhone ?? '',
+    );
+    final diabetesYearsController = TextEditingController(
+      text: profile?.diabetesYears?.toString() ?? '',
+    );
+    
+    DiabetesType? selectedDiabetesType = profile?.diabetesType;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Name',
-                border: OutlineInputBorder(),
-              ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Edit Profile'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: ageController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Age',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextField(
+                        controller: diabetesYearsController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Years w/ Diabetes',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<DiabetesType>(
+                  value: selectedDiabetesType,
+                  decoration: const InputDecoration(
+                    labelText: 'Diabetes Type',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: DiabetesType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type.displayName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedDiabetesType = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Phone Number',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.phone),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 8),
+                const Text(
+                  'Emergency Contact',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emergencyNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact Name',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: emergencyPhoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Contact Phone',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: ageController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Age',
-                border: OutlineInputBorder(),
-              ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (profile == null || profile.id.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Error: User profile not found')),
+                  );
+                  return;
+                }
+
+                try {
+                  await provider.updateProfile(
+                    name: nameController.text.trim().isEmpty ? profile.name : nameController.text.trim(),
+                    age: int.tryParse(ageController.text.trim()),
+                    phone: phoneController.text.trim(),
+                    diabetesType: selectedDiabetesType,
+                    diabetesYears: int.tryParse(diabetesYearsController.text.trim()),
+                    emergencyContactName: emergencyNameController.text.trim(),
+                    emergencyContactPhone: emergencyPhoneController.text.trim(),
+                  );
+                  
+                  if (!context.mounted) return;
+                  Navigator.pop(context);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Profile updated and saved to Firestore'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error saving profile: $e')),
+                  );
+                }
+              },
+              child: const Text('Save Changes'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (profile != null) {
-                provider.updateProfile(
-                  name: nameController.text,
-                  age: int.tryParse(ageController.text),
-                );
-              }
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }

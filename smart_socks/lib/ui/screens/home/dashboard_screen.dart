@@ -7,6 +7,7 @@ import '../../../data/models/risk_score.dart';
 import '../../../providers/sensor_provider.dart';
 import '../../../providers/risk_provider.dart';
 import '../../../providers/user_provider.dart';
+import '../../../providers/firebase/firebase_auth_provider.dart';
 import '../../widgets/risk_gauge.dart';
 import '../../widgets/sensor_card.dart';
 import '../../widgets/stat_card.dart';
@@ -28,8 +29,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     // Start streaming data when dashboard opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startMonitoring();
+      _initializeDashboard();
     });
+  }
+
+  Future<void> _initializeDashboard() async {
+    // 1. Sync profile from Firestore if logged in
+    final authProvider = context.read<FirebaseAuthProvider>();
+    final userProvider = context.read<UserProvider>();
+    
+    if (authProvider.isLoggedIn && authProvider.currentUserId != null) {
+      await userProvider.syncFromFirestore(authProvider.currentUserId!);
+    }
+
+    // 2. Start sensor monitoring
+    await _startMonitoring();
   }
 
   Future<void> _startMonitoring() async {

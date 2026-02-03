@@ -4,6 +4,7 @@ import 'package:flutter/gestures.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../data/models/user_profile.dart';
 import '../../../providers/firebase/firebase_auth_provider.dart';
+import '../../../providers/user_provider.dart';
 
 /// Sign Up screen with complete profile setup
 class SignUpScreen extends StatefulWidget {
@@ -173,6 +174,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
       );
 
       if (success && mounted) {
+        // Update local UserProvider with the created profile
+        final userProvider = context.read<UserProvider>();
+        final currentUser = authProvider.currentUser;
+        if (currentUser != null) {
+          final profileWithId = profile.copyWith(id: currentUser.uid);
+          await userProvider.saveProfile(profileWithId);
+        }
+
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/dashboard',
           (route) => false,

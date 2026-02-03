@@ -21,6 +21,14 @@ class FirebaseFirestoreService {
   static const String riskScoresCollection = 'riskScores';
   static const String alertsCollection = 'alerts';
   static const String dailySummariesCollection = 'dailySummaries';
+  static const String tokensCollection = 'tokens';
+  static const String predictionsCollection = 'predictions';
+  static const String reportsCollection = 'reports';
+  static const String activityLogsCollection = 'activityLogs';
+  static const String deviceDataCollection = 'deviceData';
+  static const String healthMetricsCollection = 'healthMetrics';
+  static const String notificationsCollection = 'notifications';
+  static const String userSettingsCollection = 'userSettings';
 
   // ============== User Profile ==============
 
@@ -285,6 +293,121 @@ class FirebaseFirestoreService {
             .toList();
       },
     );
+  }
+
+  // ============== FCM Tokens ==============
+
+  /// Save FCM token for push notifications
+  Future<void> saveFCMToken({
+    required String userId,
+    required String fcmToken,
+    String deviceName = '',
+  }) async {
+    try {
+      await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .collection('tokens')
+          .doc('fcm')
+          .set({
+            'token': fcmToken,
+            'deviceName': deviceName,
+            'updatedAt': DateTime.now(),
+            'platform': _getDevicePlatform(),
+          }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Save FCM Token Error: $e');
+    }
+  }
+
+  String _getDevicePlatform() {
+    // This would use platform-specific code in real implementation
+    return 'unknown';
+  }
+
+  // ============== Daily Summaries ==============
+
+  /// Save daily summary
+  Future<void> saveDailySummary({
+    required String userId,
+    required Map<String, dynamic> summaryData,
+  }) async {
+    try {
+      final dateKey = DateTime.now().toIso8601String().split('T')[0]; // YYYY-MM-DD
+      await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .collection('dailySummaries')
+          .doc(dateKey)
+          .set(summaryData, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Save Daily Summary Error: $e');
+    }
+  }
+
+  /// Get daily summary for a date
+  Future<Map<String, dynamic>?> getDailySummary({
+    required String userId,
+    required DateTime date,
+  }) async {
+    try {
+      final dateKey = date.toIso8601String().split('T')[0];
+      final doc = await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .collection('dailySummaries')
+          .doc(dateKey)
+          .get();
+
+      return doc.data();
+    } catch (e) {
+      debugPrint('Get Daily Summary Error: $e');
+      return null;
+    }
+  }
+
+  // ============== Health Metrics ==============
+
+  /// Save health metric (aggregated stats)
+  Future<void> saveHealthMetric({
+    required String userId,
+    required String metricName,
+    required Map<String, dynamic> metricData,
+  }) async {
+    try {
+      await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .collection('healthMetrics')
+          .doc(metricName)
+          .set(metricData, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Save Health Metric Error: $e');
+    }
+  }
+
+  // ============== Activity Logs ==============
+
+  /// Log user activity
+  Future<void> logActivity({
+    required String userId,
+    required String activityType,
+    required Map<String, dynamic> activityData,
+  }) async {
+    try {
+      await _firestore
+          .collection(usersCollection)
+          .doc(userId)
+          .collection('activityLogs')
+          .doc()
+          .set({
+            'type': activityType,
+            'timestamp': DateTime.now(),
+            ...activityData,
+          });
+    } catch (e) {
+      debugPrint('Log Activity Error: $e');
+    }
   }
 
   // ============== Helpers ==============

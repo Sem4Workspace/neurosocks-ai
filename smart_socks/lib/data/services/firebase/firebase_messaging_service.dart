@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'firebase_firestore_service.dart';
 
 /// Firebase Cloud Messaging Service
 /// Handles push notifications for alerts and updates
@@ -10,10 +11,17 @@ class FirebaseMessagingService {
   FirebaseMessagingService._internal();
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
 
   bool _isInitialized = false;
+  String? _currentUserId;
 
   // ============== Initialization ==============
+
+  /// Set current user ID for token saving
+  void setCurrentUserId(String userId) {
+    _currentUserId = userId;
+  }
 
   /// Initialize Firebase Cloud Messaging
   Future<void> initialize() async {
@@ -27,6 +35,14 @@ class FirebaseMessagingService {
       final token = await getToken();
       debugPrint('FCM Token: $token');
 
+      // Save token to Firestore if user is logged in
+      if (_currentUserId != null && token != null) {
+        await _firestoreService.saveFCMToken(
+          userId: _currentUserId!,
+          fcmToken: token,
+        );
+      }
+
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
 
@@ -38,6 +54,16 @@ class FirebaseMessagingService {
       if (initialMessage != null) {
         _handleMessageOpenedApp(initialMessage);
       }
+
+      // Listen to token refresh and save new token
+      _messaging.onTokenRefresh.listen((token) async {
+        if (_currentUserId != null) {
+          await _firestoreService.saveFCMToken(
+            userId: _currentUserId!,
+            fcmToken: token,
+          );
+        }
+      });
 
       _isInitialized = true;
     } catch (e) {

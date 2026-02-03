@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter/gestures.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/firebase/firebase_auth_provider.dart';
+import '../../../providers/user_provider.dart';
 
 /// Sign In screen with email and password
 class SignInScreen extends StatefulWidget {
@@ -51,6 +52,12 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (success && mounted) {
+        // Sync profile from Firestore
+        final userProvider = context.read<UserProvider>();
+        if (authProvider.currentUserId != null) {
+          await userProvider.syncFromFirestore(authProvider.currentUserId!);
+        }
+
         // Navigate to dashboard
         Navigator.of(context).pushNamedAndRemoveUntil(
           '/dashboard',

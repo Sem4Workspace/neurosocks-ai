@@ -19,8 +19,8 @@ class SensorProvider extends ChangeNotifier {
   final StorageService _storageService = StorageService();
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
   
-  // Use mock BLE by default for testing (change to true when deploying with real hardware)
-  bool _useRealBle = false;
+  // Use ONLY real BLE - production mode (mock is disabled)
+  bool _useRealBle = true;
   
   // Get current BLE service
   dynamic get _bleService => _useRealBle ? _realBleService : _mockBleService;
@@ -80,9 +80,9 @@ class SensorProvider extends ChangeNotifier {
   /// Get current user ID
   String? get currentUserId => _currentUserId;
 
-  /// Switch between real and mock BLE
+  /// Force real BLE (mock is disabled in production)
   void useRealBle(bool enable) {
-    _useRealBle = enable;
+    _useRealBle = true; // Always use real BLE
     notifyListeners();
   }
 
