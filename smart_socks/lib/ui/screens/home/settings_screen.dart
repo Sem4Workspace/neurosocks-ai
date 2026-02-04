@@ -246,9 +246,21 @@ class SettingsScreen extends StatelessWidget {
         const Divider(),
         SwitchListTile(
           title: const Text('Use Real Bluetooth'),
-          subtitle: const Text('Connected to actual smart socks hardware only (mock disabled)'),
-          value: true,
-          onChanged: null, // Disabled - always uses real BLE
+          subtitle: const Text('Toggle between real hardware and mock test data'),
+          value: provider.isUsingRealBle,
+          onChanged: (value) {
+            provider.useRealBle(value);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  value 
+                    ? 'Switched to Real Bluetooth (connect to hardware)'
+                    : 'Switched to Mock Data (test mode)',
+                ),
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          },
         ),
         if (provider.isConnected) ...[
           const Divider(),

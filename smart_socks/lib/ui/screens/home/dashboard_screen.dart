@@ -37,9 +37,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     // 1. Sync profile from Firestore if logged in
     final authProvider = context.read<FirebaseAuthProvider>();
     final userProvider = context.read<UserProvider>();
+    final sensorProvider = context.read<SensorProvider>();
     
     if (authProvider.isLoggedIn && authProvider.currentUserId != null) {
       await userProvider.syncFromFirestore(authProvider.currentUserId!);
+      
+      // IMPORTANT: Set the current user ID in SensorProvider
+      // This is required for saving sensor data to Firestore
+      sensorProvider.setCurrentUser(authProvider.currentUserId!);
     }
 
     // 2. Start sensor monitoring

@@ -19,8 +19,8 @@ class SensorProvider extends ChangeNotifier {
   final StorageService _storageService = StorageService();
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
   
-  // Use ONLY real BLE - production mode (mock is disabled)
-  bool _useRealBle = true;
+  // Use mock BLE for testing, real BLE for production
+  bool _useRealBle = false;  // Default to mock for testing
   
   // Get current BLE service
   dynamic get _bleService => _useRealBle ? _realBleService : _mockBleService;
@@ -80,9 +80,9 @@ class SensorProvider extends ChangeNotifier {
   /// Get current user ID
   String? get currentUserId => _currentUserId;
 
-  /// Force real BLE (mock is disabled in production)
+  /// Switch between real and mock BLE
   void useRealBle(bool enable) {
-    _useRealBle = true; // Always use real BLE
+    _useRealBle = enable;
     notifyListeners();
   }
 
@@ -107,22 +107,25 @@ class SensorProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      bool success;
-      
-      if (_useRealBle && device != null) {
+      if (_useRealBle) {
+        // Real BLE mode - requires a device
+        if (device == null) {
+          throw Exception('Real BLE mode requires a device. Please scan for devices first.');
+        }
         // Connect to specific device
         await _realBleService.connectToDevice(device);
-        success = true;
-      } else {
-        // Mock connection
-        success = await _mockBleService.connect();
-      }
-
-      if (success) {
         _isConnected = true;
         _errorMessage = null;
       } else {
-        _errorMessage = 'Failed to connect to device';
+        // Mock mode - always succeeds
+        final success = await _mockBleService.connect();
+        if (success) {
+          _isConnected = true;
+          _errorMessage = null;
+        } else {
+          _errorMessage = 'Failed to connect to mock device';
+          _isConnected = false;
+        }
       }
     } catch (e) {
       _errorMessage = 'Connection error: $e';
@@ -138,7 +141,14 @@ class SensorProvider extends ChangeNotifier {
   /// Disconnect from the device
   Future<void> disconnect() async {
     await stopStreaming();
-    await _bleService.disconnect();
+    
+    // Disconnect from the appropriate service
+    if (_useRealBle) {
+      await _realBleService.disconnect();
+    } else {
+      await _mockBleService.disconnect();
+    }
+    
     _isConnected = false;
     _currentReading = null;
     _leftFootData = null;
@@ -156,19 +166,38 @@ class SensorProvider extends ChangeNotifier {
     if (_isStreaming) return;
 
     try {
-      await _bleService.startStreaming(
-        interval: interval,
-        simulateAnomalies: simulateAnomalies,
-      );
+      // Validate real BLE connection if in real mode
+      if (_useRealBle) {
+        if (!_isConnected) {
+          _errorMessage = 'Not connected to device. Please connect first.';
+          notifyListeners();
+          return;
+        }
+      }
 
-      _subscription = _bleService.sensorStream?.listen(
-        _onReadingReceived,
-        onError: _onStreamError,
-        onDone: _onStreamDone,
-      );
+      // Start streaming with the appropriate service
+      if (_useRealBle) {
+        // Real BLE doesn't use interval/simulateAnomalies parameters
+        await _realBleService.startStreaming();
+        _subscription = _realBleService.sensorStream?.listen(
+          _onReadingReceived,
+          onError: _onStreamError,
+          onDone: _onStreamDone,
+        );
+      } else {
+        // Mock service uses these parameters
+        await _mockBleService.startStreaming(
+          interval: interval,
+          simulateAnomalies: simulateAnomalies,
+        );
+        _subscription = _mockBleService.sensorStream?.listen(
+          _onReadingReceived,
+          onError: _onStreamError,
+          onDone: _onStreamDone,
+        );
+      }
 
       _isStreaming = true;
-      _isConnected = true;
       _errorMessage = null;
       notifyListeners();
     } catch (e) {
@@ -181,7 +210,14 @@ class SensorProvider extends ChangeNotifier {
   Future<void> stopStreaming() async {
     await _subscription?.cancel();
     _subscription = null;
-    await _bleService.stopStreaming();
+    
+    // Stop streaming on the appropriate service
+    if (_useRealBle) {
+      await _realBleService.stopStreaming();
+    } else {
+      await _mockBleService.stopStreaming();
+    }
+    
     _isStreaming = false;
     notifyListeners();
   }
@@ -189,6 +225,7 @@ class SensorProvider extends ChangeNotifier {
   /// Handle incoming sensor reading
   void _onReadingReceived(SensorReading reading) {
     _currentReading = reading;
+    debugPrint('📊 Received reading - Temp: ${reading.temperatures}, Pressure: ${reading.pressures}');
 
     // Update foot data models
     _updateFootData(reading);
@@ -206,6 +243,8 @@ class SensorProvider extends ChangeNotifier {
     if (_currentUserId != null) {
       _saveReadingToFirestore(reading);
       _savePredictionToFirestore(reading);
+    } else {
+      debugPrint('⚠️  Cannot save to Firestore: _currentUserId is null');
     }
 
     notifyListeners();
@@ -213,21 +252,29 @@ class SensorProvider extends ChangeNotifier {
 
   /// Save sensor reading to Firestore (async)
   Future<void> _saveReadingToFirestore(SensorReading reading) async {
-    if (_currentUserId == null) return;
+    if (_currentUserId == null) {
+      debugPrint('❌ Cannot save sensor reading: userId is null');
+      return;
+    }
     
     try {
+      debugPrint('💾 Saving sensor reading for user: $_currentUserId');
       await _firestoreService.saveSensorReading(
         userId: _currentUserId!,
         reading: reading,
       );
+      debugPrint('✅ Sensor reading saved successfully');
     } catch (e) {
-      debugPrint('Firestore save error: $e');
+      debugPrint('❌ Firestore save error: $e');
     }
   }
 
   /// Save foot ulcer prediction to Firestore
   Future<void> _savePredictionToFirestore(SensorReading reading) async {
-    if (_currentUserId == null) return;
+    if (_currentUserId == null) {
+      debugPrint('❌ Cannot save prediction: userId is null');
+      return;
+    }
 
     try {
       // Generate prediction
@@ -249,12 +296,14 @@ class SensorProvider extends ChangeNotifier {
         recommendations: [prediction.recommendation],
       );
 
+      debugPrint('💾 Saving risk prediction for user: $_currentUserId');
       await _firestoreService.saveRiskScore(
         userId: _currentUserId!,
         riskScore: riskScore,
       );
+      debugPrint('✅ Risk prediction saved successfully');
     } catch (e) {
-      debugPrint('Prediction save error: $e');
+      debugPrint('❌ Prediction save error: $e');
     }
   }
 
