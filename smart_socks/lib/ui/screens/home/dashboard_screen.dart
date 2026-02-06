@@ -38,34 +38,42 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final authProvider = context.read<FirebaseAuthProvider>();
     final userProvider = context.read<UserProvider>();
     final sensorProvider = context.read<SensorProvider>();
-    
+
     if (authProvider.isLoggedIn && authProvider.currentUserId != null) {
       await userProvider.syncFromFirestore(authProvider.currentUserId!);
-      
+
       // IMPORTANT: Set the current user ID in SensorProvider
       // This is required for saving sensor data to Firestore
       sensorProvider.setCurrentUser(authProvider.currentUserId!);
     }
 
-    // 2. Start sensor monitoring
-    await _startMonitoring();
+    // 2. Start sensor monitoring (real BLE mode - no auto-connect)
+    // Real BLE requires manual connection via device scan in settings
+    debugPrint('Dashboard initialized. Real BLE mode is default.');
+    debugPrint('Please go to Settings to scan and connect your device.');
   }
 
-  Future<void> _startMonitoring() async {
-    final sensorProvider = context.read<SensorProvider>();
-    if (!sensorProvider.isStreaming) {
-      await sensorProvider.connect();
-      await sensorProvider.startStreaming();
-    }
-  }
 
   Future<void> _onRefresh() async {
     final sensorProvider = context.read<SensorProvider>();
+
     if (!sensorProvider.isStreaming) {
-      await sensorProvider.startStreaming();
+      if (sensorProvider.isUsingRealBle) {
+        // Real BLE mode
+        if (!sensorProvider.isConnected) {
+          debugPrint(
+            '⚠️  Real BLE mode: Device not connected. Cannot start streaming.',
+          );
+          return;
+        }
+        await sensorProvider.startStreaming();
+      } else {
+        // Mock mode
+        await sensorProvider.startStreaming();
+      }
+    } else {
+      await sensorProvider.stopStreaming();
     }
-    // Wait a moment for new data
-    await Future.delayed(const Duration(seconds: 1));
   }
 
   @override
@@ -77,7 +85,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Consumer3<SensorProvider, RiskProvider, UserProvider>(
           builder: (context, sensorProvider, riskProvider, userProvider, _) {
             // Show loading skeleton if no data yet
-            if (sensorProvider.currentReading == null && !sensorProvider.isStreaming) {
+            if (sensorProvider.currentReading == null &&
+                !sensorProvider.isStreaming) {
               return const DashboardSkeleton();
             }
 
@@ -87,6 +96,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Warning banner if Real BLE mode but no device connected
+                  if (sensorProvider.isUsingRealBle && !sensorProvider.isConnected)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange[50],
+                        border: Border.all(color: Colors.orange, width: 1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber, color: Colors.orange[700]),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Bluetooth not connected. Go to Settings to scan and connect device.',
+                              style: TextStyle(color: Colors.orange[900]),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // Connection status bar
                   _buildConnectionStatus(sensorProvider),
                   const SizedBox(height: 20),
@@ -211,7 +245,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildRiskSection(RiskProvider riskProvider) {
     final riskScore = riskProvider.currentRiskScore;
-    
+
     return Center(
       child: Column(
         children: [
@@ -224,7 +258,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Risk gauge
           if (riskScore != null)
             RiskGauge.fromRiskScore(
@@ -234,14 +268,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
               showLabel: true,
             )
           else
-            RiskGauge(
-              score: 0,
-              level: RiskLevel.low,
-              size: 220,
-            ),
-          
+            RiskGauge(score: 0, level: RiskLevel.low, size: 220),
+
           const SizedBox(height: 16),
-          
+
           // Risk level message
           _buildRiskMessage(riskProvider.currentRiskLevel),
         ],
@@ -291,24 +321,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
           Text(
             message,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildQuickStats(SensorProvider sensorProvider, RiskProvider riskProvider) {
+  Widget _buildQuickStats(
+    SensorProvider sensorProvider,
+    RiskProvider riskProvider,
+  ) {
     return Row(
       children: [
         Expanded(
-          child: StatCard.steps(
-            steps: sensorProvider.stepCount,
-            goal: 10000,
-          ),
+          child: StatCard.steps(steps: sensorProvider.stepCount, goal: 10000),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -325,7 +352,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildSensorSection(SensorProvider provider) {
     final reading = provider.currentReading;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -334,10 +361,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               AppStrings.currentReadings,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             TextButton(
               onPressed: () {
@@ -348,7 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        
+
         // Sensor cards grid
         GridView.count(
           crossAxisCount: 2,
@@ -361,25 +385,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
             // Temperature (average of all zones)
             SensorCard.temperature(
               value: reading != null && reading.temperatures.isNotEmpty
-                  ? reading.temperatures.reduce((a, b) => a + b) / reading.temperatures.length
+                  ? reading.temperatures.reduce((a, b) => a + b) /
+                        reading.temperatures.length
                   : 0,
               onTap: () => Navigator.of(context).pushNamed('/sensors'),
             ),
-            
+
             // Pressure (average)
             SensorCard.pressure(
               value: reading != null && reading.pressures.isNotEmpty
-                  ? reading.pressures.reduce((a, b) => a + b) / reading.pressures.length
+                  ? reading.pressures.reduce((a, b) => a + b) /
+                        reading.pressures.length
                   : 0,
               onTap: () => Navigator.of(context).pushNamed('/sensors'),
             ),
-            
+
             // SpO2
             SensorCard.spO2(
               value: provider.spO2,
               onTap: () => Navigator.of(context).pushNamed('/sensors'),
             ),
-            
+
             // Heart Rate
             SensorCard.heartRate(
               value: provider.heartRate,
@@ -402,10 +428,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               AppStrings.alerts,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             if (recentAlerts.isNotEmpty)
               TextButton(
@@ -421,16 +444,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         if (recentAlerts.isEmpty)
           _buildNoAlertsCard()
         else
-          ...recentAlerts.map((alert) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: AlertTile(
-                  alert: alert,
-                  dismissible: false,
-                  onTap: () {
-                    riskProvider.markAlertAsRead(alert.id);
-                  },
-                ),
-              )),
+          ...recentAlerts.map(
+            (alert) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: AlertTile(
+                alert: alert,
+                dismissible: false,
+                onTap: () {
+                  riskProvider.markAlertAsRead(alert.id);
+                },
+              ),
+            ),
+          ),
       ],
     );
   }
@@ -446,11 +471,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Column(
         children: [
-          Icon(
-            Icons.check_circle,
-            color: AppColors.success,
-            size: 48,
-          ),
+          Icon(Icons.check_circle, color: AppColors.success, size: 48),
           const SizedBox(height: 12),
           Text(
             AppStrings.allClear,
@@ -461,12 +482,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            AppStrings.noAlerts,
-            style: TextStyle(
-              color: Colors.grey[600],
-            ),
-          ),
+          Text(AppStrings.noAlerts, style: TextStyle(color: Colors.grey[600])),
         ],
       ),
     );
@@ -478,40 +494,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         Text(
           AppStrings.recommendations,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        
-        ...riskProvider.recommendations.take(3).map((rec) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.lightbulb_outline, color: AppColors.info, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        rec,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[800],
+
+        ...riskProvider.recommendations
+            .take(3)
+            .map(
+              (rec) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.info.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline,
+                        color: AppColors.info,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          rec,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[800],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            )),
+            ),
       ],
     );
   }

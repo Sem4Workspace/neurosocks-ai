@@ -20,13 +20,16 @@ class SensorProvider extends ChangeNotifier {
   final FirebaseFirestoreService _firestoreService = FirebaseFirestoreService();
   
   // Use mock BLE for testing, real BLE for production
-  bool _useRealBle = false;  // Default to mock for testing
+  bool _useRealBle = true;  // Default to REAL BLE (production mode)
   
   // Get current BLE service
   dynamic get _bleService => _useRealBle ? _realBleService : _mockBleService;
   
   // Public getter for UI
   bool get isUsingRealBle => _useRealBle;
+
+  // Public getter for RealBleService (for device scanning)
+  RealBleService get realBleService => _realBleService;
   
   // User context
   String? _currentUserId;
@@ -166,18 +169,23 @@ class SensorProvider extends ChangeNotifier {
     if (_isStreaming) return;
 
     try {
-      // Validate real BLE connection if in real mode
+      // CRITICAL: Validate real BLE connection FIRST
       if (_useRealBle) {
         if (!_isConnected) {
-          _errorMessage = 'Not connected to device. Please connect first.';
+          _errorMessage = '❌ Real BLE mode: Not connected to device. Please scan and connect first.';
+          debugPrint(_errorMessage);
           notifyListeners();
           return;
         }
+        debugPrint('✅ Real BLE mode: Device connected, starting stream...');
+      } else {
+        debugPrint('✅ Mock mode: Starting stream...');
       }
 
       // Start streaming with the appropriate service
       if (_useRealBle) {
         // Real BLE doesn't use interval/simulateAnomalies parameters
+        debugPrint('Starting RealBleService.startStreaming()');
         await _realBleService.startStreaming();
         _subscription = _realBleService.sensorStream?.listen(
           _onReadingReceived,
@@ -186,6 +194,7 @@ class SensorProvider extends ChangeNotifier {
         );
       } else {
         // Mock service uses these parameters
+        debugPrint('Starting MockBleService.startStreaming()');
         await _mockBleService.startStreaming(
           interval: interval,
           simulateAnomalies: simulateAnomalies,
@@ -199,9 +208,12 @@ class SensorProvider extends ChangeNotifier {
 
       _isStreaming = true;
       _errorMessage = null;
+      debugPrint('✅ Streaming started successfully');
       notifyListeners();
     } catch (e) {
-      _errorMessage = 'Failed to start streaming: $e';
+      _errorMessage = '❌ Failed to start streaming: $e';
+      debugPrint(_errorMessage);
+      _isStreaming = false;
       notifyListeners();
     }
   }
