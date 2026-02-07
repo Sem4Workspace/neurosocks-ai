@@ -34,22 +34,21 @@ class _DashboardScreenExampleState extends State<DashboardScreenExample> {
     // Start BLE connection
     if (!sensorProvider.isStreaming) {
       try {
-        // For testing: use mock data (set to false for real BLE)
-        final useReal = false;
-        sensorProvider.useRealBle(useReal);
-
-        // Real device scanning would go here:
-        // final devices = await sensorProvider.scanForDevices();
-        // if (devices.isNotEmpty) {
-        //   await sensorProvider.connect(device: devices[0].device);
-        // }
-
-        // Use mock device for testing
-        await sensorProvider.connect();
-
-        // Start streaming
-        await sensorProvider.startStreaming();
+        // Real usage: Navigate to device scan screen for user to select device
+        // For now, just start streaming (will use Firestore fallback if no device)
+        
+        // Start streaming with automatic BLE/Firestore fallback
+        final isLive = await sensorProvider.startStreaming();
+        
+        if (!isLive && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No device connected. Showing recent data from Firestore.'),
+            ),
+          );
+        }
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Connection error: $e')),
         );

@@ -1,7 +1,6 @@
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:io';
-import 'dart:typed_data';
 
 /// Firebase Cloud Storage Service
 /// Handles file uploads (photos, reports, documents)

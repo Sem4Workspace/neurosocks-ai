@@ -23,7 +23,7 @@ class DeviceConnectionService {
   factory DeviceConnectionService() => _instance;
   DeviceConnectionService._internal();
 
-  List<DeviceConnection> _discoveredDevices = [];
+  final List<DeviceConnection> _discoveredDevices = [];
   DeviceConnection? _selectedDevice;
 
   List<DeviceConnection> get discoveredDevices => _discoveredDevices;

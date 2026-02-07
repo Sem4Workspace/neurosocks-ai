@@ -147,9 +147,11 @@ class FirebaseMessagingService {
 
   /// Set background message handler (call from main.dart)
   /// Must be a top-level function
+  /// ```
   /// static Future<void> handleBackgroundMessage(RemoteMessage message) async {
   ///   debugPrint('Background Message: ${message.messageId}');
   /// }
+  /// ```
 
   // ============== Notification Settings ==============
 

@@ -182,10 +182,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
           await userProvider.saveProfile(profileWithId);
         }
 
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/dashboard',
-          (route) => false,
-        );
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/dashboard',
+            (route) => false,
+          );
+        }
       } else if (mounted) {
         _showErrorSnackbar(authProvider.errorMessage ?? 'Sign up failed');
       }

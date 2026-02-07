@@ -2,6 +2,7 @@
 // Connects to actual smart socks hardware via Bluetooth Low Energy
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import '../models/sensor_reading.dart';
 import '../../core/constants/sensor_constants.dart';
@@ -40,8 +41,15 @@ class RealBleService {
   /// Scan for nearby smart socks devices
   Future<List<ScanResult>> scanForDevices({int timeoutSeconds = 10}) async {
     try {
+      // BLE is not supported on web platform
+      if (kIsWeb) {
+        debugPrint('⚠️ Bluetooth not supported on web platform');
+        throw Exception('Bluetooth not available on web');
+      }
+
       // Check Bluetooth is on
-      if (!(await FlutterBluePlus.isOn)) {
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
         throw Exception('Bluetooth is disabled');
       }
 
@@ -80,6 +88,12 @@ class RealBleService {
   /// Connect to a specific device
   Future<bool> connectToDevice(BluetoothDevice device) async {
     try {
+      // BLE is not supported on web platform
+      if (kIsWeb) {
+        debugPrint('⚠️ Bluetooth not supported on web platform');
+        throw Exception('Bluetooth not available on web');
+      }
+
       _device = device;
       _deviceName = device.platformName;
 
@@ -149,12 +163,18 @@ class RealBleService {
 
   /// Generic debug print function
   void debugPrint(String message) {
-    print(message);
+    if (kDebugMode) {
+      // ignore: avoid_print
+      print(message);
+    }
   }
 
   /// Disconnect from device
   Future<void> disconnect() async {
     try {
+      if (kIsWeb) {
+        return; // No-op on web
+      }
       await stopStreaming();
       await _device?.disconnect();
       _isConnected = false;
@@ -171,6 +191,12 @@ class RealBleService {
   /// Start streaming sensor data from device
   Future<void> startStreaming() async {
     try {
+      // BLE is not supported on web platform
+      if (kIsWeb) {
+        debugPrint('⚠️ Bluetooth not supported on web platform. Use Firestore data.');
+        throw Exception('Bluetooth not available on web');
+      }
+
       if (!_isConnected || _sensorCharacteristic == null) {
         throw Exception('Device not connected or characteristic not found');
       }
@@ -206,6 +232,9 @@ class RealBleService {
   /// Stop streaming
   Future<void> stopStreaming() async {
     try {
+      if (kIsWeb) {
+        return; // No-op on web
+      }
       _isStreaming = false;
       await _notificationSubscription?.cancel();
       await _sensorCharacteristic?.setNotifyValue(false);

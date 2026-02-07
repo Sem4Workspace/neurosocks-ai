@@ -44,15 +44,15 @@ class FootUlcerPrediction {
 /// Uses ML model (simplified here) to predict foot ulcer risk
 class FootUlcerPredictionService {
   // Risk thresholds
-  static const double TEMP_EXCESSIVE_HIGH = 35.0; // Above normal foot temp
-  static const double TEMP_MODERATE_HIGH = 33.5;
-  static const double PRESSURE_CRITICAL = 60.0; // kPa
-  static const double PRESSURE_HIGH = 50.0;     // kPa
-  static const double PRESSURE_MODERATE = 40.0; // kPa
+  static const double tempExcessiveHigh = 35.0; // Above normal foot temp
+  static const double tempModerateHigh = 33.5;
+  static const double pressureCritical = 60.0; // kPa
+  static const double pressureHigh = 50.0;     // kPa
+  static const double pressureModerate = 40.0; // kPa
 
   // Temperature difference thresholds (between zones)
-  static const double TEMP_ZONE_DIFF_CRITICAL = 2.5;
-  static const double TEMP_ZONE_DIFF_HIGH = 1.8;
+  static const double tempZoneDiffCritical = 2.5;
+  static const double tempZoneDiffHigh = 1.8;
 
   /// Predict foot ulcer risk from sensor reading
   static FootUlcerPrediction predictRisk(
@@ -120,15 +120,15 @@ class FootUlcerPredictionService {
       final pressure = reading.pressures[i];
       final zoneName = _getZoneName(i);
 
-      if (pressure > PRESSURE_CRITICAL) {
+      if (pressure > pressureCritical) {
         risk += 25;
         factors.add('Critical pressure in $zoneName (${pressure.toStringAsFixed(1)} kPa)');
         zone = zoneName;
-      } else if (pressure > PRESSURE_HIGH) {
+      } else if (pressure > pressureHigh) {
         risk += 15;
         factors.add('High pressure in $zoneName (${pressure.toStringAsFixed(1)} kPa)');
         if (zone.isEmpty) zone = zoneName;
-      } else if (pressure > PRESSURE_MODERATE) {
+      } else if (pressure > pressureModerate) {
         risk += 5;
         factors.add('Moderate pressure in $zoneName');
       }
@@ -147,11 +147,11 @@ class FootUlcerPredictionService {
       final temp = reading.temperatures[i];
       final zoneName = _getZoneName(i);
 
-      if (temp > TEMP_EXCESSIVE_HIGH) {
+      if (temp > tempExcessiveHigh) {
         risk += 20;
         factors.add('Excessive temperature in $zoneName (${temp.toStringAsFixed(1)}°C)');
         zone = zoneName;
-      } else if (temp > TEMP_MODERATE_HIGH) {
+      } else if (temp > tempModerateHigh) {
         risk += 10;
         factors.add('Elevated temperature in $zoneName (${temp.toStringAsFixed(1)}°C)');
         if (zone.isEmpty) zone = zoneName;
@@ -164,10 +164,10 @@ class FootUlcerPredictionService {
       final minTemp = reading.temperatures.reduce((a, b) => a < b ? a : b);
       final diff = maxTemp - minTemp;
 
-      if (diff > TEMP_ZONE_DIFF_CRITICAL) {
+      if (diff > tempZoneDiffCritical) {
         risk += 15;
         factors.add('Critical temperature asymmetry (${diff.toStringAsFixed(1)}°C difference)');
-      } else if (diff > TEMP_ZONE_DIFF_HIGH) {
+      } else if (diff > tempZoneDiffHigh) {
         risk += 8;
         factors.add('Significant temperature difference between zones');
       }

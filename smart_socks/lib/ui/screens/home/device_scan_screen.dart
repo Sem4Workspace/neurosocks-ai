@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../providers/sensor_provider.dart';
+import '../../../data/services/storage_service.dart';
 
 /// Screen for scanning and connecting to BLE devices
 class DeviceScanScreen extends StatefulWidget {
@@ -16,6 +18,8 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
   late Future<List<ScanResult>> _scanFuture;
   BluetoothDevice? _connectingDevice;
   String? _connectingError;
+  final StorageService _storage = StorageService();
+  static const platform = MethodChannel('com.neurosocks.app/bluetooth');
 
   @override
   void initState() {
@@ -39,6 +43,42 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
     }
   }
 
+  /// Open system Bluetooth settings
+  Future<void> _openBluetoothSettings() async {
+    try {
+      await platform.invokeMethod('openBluetoothSettings');
+    } catch (e) {
+      debugPrint('Error opening Bluetooth settings: $e');
+      // Fallback: show guide to user
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Open Bluetooth Settings'),
+          content: const Text(
+            'Please enable Bluetooth and manually connect to your smart socks device in the system settings.\n\nOnce connected, return to this app and tap "Try Again" to proceed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  /// Save device as last connected
+  Future<void> _saveLastConnectedDevice(BluetoothDevice device) async {
+    try {
+      await _storage.saveLastConnectedDeviceId(device.remoteId.toString());
+      debugPrint('Saved last connected device: ${device.platformName}');
+    } catch (e) {
+      debugPrint('Error saving device: $e');
+    }
+  }
+
   Future<void> _connectToDevice(BluetoothDevice device) async {
     setState(() {
       _connectingDevice = device;
@@ -47,13 +87,11 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
 
     try {
       final sensorProvider = context.read<SensorProvider>();
-      bool connected = await sensorProvider.realBleService.connectToDevice(
-        device,
-      );
+      bool connected = await sensorProvider.connectToDevice(device);
 
       if (connected) {
-        // Update sensor provider state
-        await sensorProvider.connect();
+        // Device connected successfully
+        await _saveLastConnectedDevice(device);
 
         if (!mounted) return;
 
@@ -159,13 +197,37 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
             style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _scanFuture = _startScan();
-              });
-            },
-            child: const Text('Try Again'),
+          Column(
+            children: [
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _scanFuture = _startScan();
+                  });
+                },
+                child: const Text('Try Again'),
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _openBluetoothSettings,
+                icon: const Icon(Icons.settings_bluetooth),
+                label: const Text('Open Bluetooth Settings'),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: const Text(
+                  '💡 Tip: You can also connect manually through system Bluetooth settings, then return here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.blue),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -230,32 +292,40 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                 color: AppColors.primary,
               ),
             ),
-            title: Text(
-              device.platformName.isNotEmpty
-                  ? device.platformName
-                  : 'Unnamed Device',
-              style: const TextStyle(fontWeight: FontWeight.w500),
+            title: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Text(
+                device.platformName.isNotEmpty
+                    ? device.platformName
+                    : 'Unnamed Device',
+                style: const TextStyle(fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 4),
-                Text(
-                  'ID: ${device.remoteId}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+            subtitle: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: ${device.remoteId}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Signal: ${result.rssi} dBm',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Signal: ${result.rssi} dBm',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             trailing: isConnecting
                 ? SizedBox(
@@ -268,9 +338,12 @@ class _DeviceScanScreenState extends State<DeviceScanScreen> {
                       ),
                     ),
                   )
-                : ElevatedButton(
-                    onPressed: () => _connectToDevice(device),
-                    child: const Text('Connect'),
+                : SizedBox(
+                    width: 120,
+                    child: ElevatedButton(
+                      onPressed: () => _connectToDevice(device),
+                      child: const Text('Connect'),
+                    ),
                   ),
           ),
         );

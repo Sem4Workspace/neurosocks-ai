@@ -223,66 +223,45 @@ class SettingsScreen extends StatelessWidget {
           title: Text(
             provider.isConnected ? provider.deviceName : 'No device connected',
             style: const TextStyle(fontWeight: FontWeight.w500),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
           subtitle: Text(
             provider.isConnected
                 ? 'Battery: ${provider.batteryLevel}%'
                 : 'Tap to connect',
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
           ),
-          trailing: provider.isConnected
-              ? TextButton(
-                  onPressed: () => provider.disconnect(),
-                  child: const Text('Disconnect'),
-                )
-              : ElevatedButton(
-                  onPressed: () {
-                    if (provider.isUsingRealBle) {
-                      // Real BLE mode: navigate to device scan screen
+          trailing: SizedBox(
+            width: 120,
+            child: provider.isConnected
+                ? TextButton(
+                    onPressed: () => provider.disconnect(),
+                    child: const Text('Disconnect'),
+                  )
+                : ElevatedButton(
+                    onPressed: () {
+                      // Navigate to device scan screen for Bluetooth connection
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (context) => const DeviceScanScreen(),
                         ),
                       );
-                    } else {
-                      // Mock mode: auto-connect
-                      provider.connect();
-                    }
-                  },
-                  child: const Text('Connect'),
-                ),
+                    },
+                    child: const Text('Connect'),
+                  ),
+          ),
         ),
         const Divider(),
         SwitchListTile(
-          title: const Text('Use Real Bluetooth'),
-          subtitle: const Text(
-            'Toggle between real hardware and mock test data',
-          ),
-          value: provider.isUsingRealBle,
+          title: const Text('Auto-reconnect'),
+          subtitle: const Text('Reconnect when device is in range'),
+          value: true, // TODO: Implement auto-reconnect setting
           onChanged: (value) {
-            provider.useRealBle(value);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  value
-                      ? 'Switched to Real Bluetooth (connect to hardware)'
-                      : 'Switched to Mock Data (test mode)',
-                ),
-                duration: const Duration(seconds: 2),
-              ),
-            );
+            // TODO: Implement
           },
         ),
-        if (provider.isConnected) ...[
-          const Divider(),
-          SwitchListTile(
-            title: const Text('Auto-reconnect'),
-            subtitle: const Text('Reconnect when device is in range'),
-            value: true, // TODO: Implement auto-reconnect setting
-            onChanged: (value) {
-              // TODO: Implement
-            },
-          ),
-        ],
       ],
     );
   }

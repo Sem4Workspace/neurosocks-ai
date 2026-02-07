@@ -10,7 +10,7 @@ class FirebaseNotificationsProvider extends ChangeNotifier {
   bool _isInitialized = false;
   String? _fcmToken;
   bool _notificationsEnabled = true;
-  List<String> _subscribedTopics = [];
+  final List<String> _subscribedTopics = [];
   String? _pendingNotificationData;
 
   // Getters
@@ -150,10 +150,5 @@ class FirebaseNotificationsProvider extends ChangeNotifier {
   /// Check if subscribed to topic
   bool isSubscribedToTopic(String topic) {
     return _subscribedTopics.contains(topic);
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 }

@@ -155,6 +155,14 @@ class FirebaseFirestoreService {
     }
   }
 
+  /// Get recent readings from Firestore (alias for getSensorReadings)
+  Future<List<SensorReading>> getRecentReadings({
+    required String userId,
+    int limit = 50,
+  }) async {
+    return getSensorReadings(userId: userId, limit: limit);
+  }
+
   // ============== Risk Scores ==============
 
   /// Save risk score to Firestore

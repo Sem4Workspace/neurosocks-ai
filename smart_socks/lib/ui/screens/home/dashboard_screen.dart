@@ -14,6 +14,7 @@ import '../../widgets/stat_card.dart';
 import '../../widgets/alert_tile.dart';
 import '../../widgets/connection_status.dart';
 import '../../widgets/loading_shimmer.dart';
+import 'device_scan_screen.dart';
 
 /// Main dashboard screen showing overview of foot health
 class DashboardScreen extends StatefulWidget {
@@ -58,19 +59,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final sensorProvider = context.read<SensorProvider>();
 
     if (!sensorProvider.isStreaming) {
-      if (sensorProvider.isUsingRealBle) {
-        // Real BLE mode
-        if (!sensorProvider.isConnected) {
-          debugPrint(
-            '⚠️  Real BLE mode: Device not connected. Cannot start streaming.',
-          );
-          return;
-        }
-        await sensorProvider.startStreaming();
-      } else {
-        // Mock mode
-        await sensorProvider.startStreaming();
-      }
+      // Always attempt to start streaming
+      // If not connected, the provider will load from Firestore as fallback
+      await sensorProvider.startStreaming();
     } else {
       await sensorProvider.stopStreaming();
     }
@@ -96,8 +87,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Warning banner if Real BLE mode but no device connected
-                  if (sensorProvider.isUsingRealBle && !sensorProvider.isConnected)
+                  // Warning banner if not connected to Bluetooth
+                  if (!sensorProvider.isConnected)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -113,7 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'Bluetooth not connected. Go to Settings to scan and connect device.',
+                              'Bluetooth not connected. Showing previous data. Go to Settings to connect device.',
                               style: TextStyle(color: Colors.orange[900]),
                             ),
                           ),
@@ -237,7 +228,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       batteryLevel: provider.batteryLevel,
       onTap: () {
         if (!provider.isConnected) {
-          provider.connect();
+          // Navigate to device scan screen to connect
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const DeviceScanScreen(),
+            ),
+          );
         }
       },
     );

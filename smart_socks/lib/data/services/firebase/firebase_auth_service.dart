@@ -108,7 +108,7 @@ class FirebaseAuthService {
   /// Update user email
   Future<void> updateEmail(String newEmail) async {
     try {
-      await _auth.currentUser?.updateEmail(newEmail);
+      await _auth.currentUser?.verifyBeforeUpdateEmail(newEmail);
     } on FirebaseAuthException catch (e) {
       debugPrint('Update Email Error: ${e.code} - ${e.message}');
       rethrow;

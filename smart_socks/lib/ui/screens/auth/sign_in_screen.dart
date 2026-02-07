@@ -59,10 +59,12 @@ class _SignInScreenState extends State<SignInScreen> {
         }
 
         // Navigate to dashboard
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/dashboard',
-          (route) => false,
-        );
+        if (mounted) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/dashboard',
+            (route) => false,
+          );
+        }
       } else if (mounted) {
         _showErrorSnackbar(authProvider.errorMessage ?? 'Sign in failed');
       }
