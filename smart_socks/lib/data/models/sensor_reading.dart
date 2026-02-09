@@ -291,12 +291,11 @@ class AccelerometerData extends Equatable {
 
   /// Magnitude of acceleration (square root)
   double get magnitudeSqrt {
-    import_sqrt();
     return magnitude;
   }
 
   // Helper to calculate sqrt
-  double import_sqrt() {
+  double calcSqrt() {
     // Using dart:math would be: sqrt(magnitude)
     // Simple approximation for now
     double val = magnitude;
